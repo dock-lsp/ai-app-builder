@@ -1,21 +1,22 @@
-# 🚀 阿里云服务器部署指南
+# 🚀 阿里云服务器部署指南 (CentOS)
 
 ## 📋 部署前准备
 
 ### 服务器要求
-- **系统**: Ubuntu 20.04/22.04 LTS
+- **系统**: CentOS 7/8 或 Ubuntu 20.04/22.04 LTS
 - **内存**: 至少 2GB RAM
 - **磁盘**: 至少 10GB 可用空间
 - **网络**: 开放 80 端口 (HTTP)
 
 ### 服务器信息
 - **IP**: 47.92.220.102
+- **系统**: CentOS
 - **用户名**: root
 - **密码**: mm900236..
 
 ---
 
-## 🔧 部署步骤
+## 🔧 快速部署（推荐）
 
 ### 1. 连接服务器
 
@@ -24,55 +25,82 @@ ssh root@47.92.220.102
 # 密码: mm900236..
 ```
 
-### 2. 一键部署脚本
+### 2. 一键部署
 
 连接服务器后，执行以下命令：
 
 ```bash
-# 下载部署脚本
+# 下载并执行部署脚本
 curl -fsSL https://raw.githubusercontent.com/dock-lsp/ai-app-builder/main/deploy.sh -o /tmp/deploy.sh
-
-# 执行部署
 chmod +x /tmp/deploy.sh
 /tmp/deploy.sh
 ```
 
-### 3. 手动部署（备用方案）
+脚本会自动：
+- ✅ 检测系统类型（CentOS/Ubuntu）
+- ✅ 安装 Node.js 20
+- ✅ 安装 Nginx
+- ✅ 克隆代码
+- ✅ 构建前端
+- ✅ 启动后端服务（PM2）
+- ✅ 配置 Nginx 反向代理
+- ✅ 配置防火墙
+
+---
+
+## 📝 手动部署（CentOS）
 
 如果一键脚本失败，可以手动执行：
 
+### 1. 安装系统依赖
+
 ```bash
-# 1. 安装依赖
-apt-get update
-apt-get install -y nginx git curl
+# CentOS 7
+yum install -y epel-release
+yum install -y nginx git curl wget
 
-# 2. 安装 Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+# CentOS 8 / Rocky Linux
+dnf install -y epel-release
+dnf install -y nginx git curl wget
+```
 
-# 3. 创建应用目录
+### 2. 安装 Node.js 20
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+yum install -y nodejs   # CentOS 7
+# 或
+dnf install -y nodejs   # CentOS 8
+```
+
+### 3. 克隆代码
+
+```bash
 mkdir -p /var/www/ai-app-builder
 cd /var/www/ai-app-builder
-
-# 4. 克隆代码
 git clone https://github.com/dock-lsp/ai-app-builder.git .
+```
 
-# 5. 安装依赖
+### 4. 安装依赖并构建
+
+```bash
 npm ci
-
-# 6. 构建
 npm run build
+```
 
-# 7. 安装 PM2
+### 5. 启动后端服务
+
+```bash
 npm install -g pm2 tsx
-
-# 8. 启动后端
 pm2 start --name ai-app-builder-api --interpreter tsx ./server/index.ts
 pm2 save
-pm2 startup
+pm2 startup systemd
+```
 
-# 9. 配置 Nginx
-cat > /etc/nginx/sites-available/ai-app-builder << 'EOF'
+### 6. 配置 Nginx
+
+```bash
+cat > /etc/nginx/conf.d/ai-app-builder.conf << 'EOF'
 server {
     listen 80;
     server_name _;
@@ -95,10 +123,24 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/ai-app-builder /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
+# 启动 Nginx
+systemctl enable nginx
 systemctl restart nginx
+```
+
+### 7. 配置防火墙（CentOS）
+
+```bash
+# 使用 firewalld
+systemctl start firewalld
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --reload
+
+# 或使用 iptables
+iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+service iptables save
 ```
 
 ---
@@ -157,19 +199,20 @@ systemctl restart nginx
 ## 🛠️ 故障排查
 
 ### 1. 无法访问网站
+
 ```bash
 # 检查 Nginx 是否运行
 systemctl status nginx
 
-# 检查防火墙
-ufw status
-ufw allow 80/tcp
-
 # 检查端口监听
 netstat -tlnp | grep :80
+
+# 检查防火墙（CentOS）
+firewall-cmd --list-ports
 ```
 
 ### 2. API 无法连接
+
 ```bash
 # 检查后端服务
 pm2 status
@@ -180,12 +223,24 @@ netstat -tlnp | grep :3001
 ```
 
 ### 3. 前端显示 404
+
 ```bash
 # 检查 dist 目录是否存在
 ls -la /var/www/ai-app-builder/dist/
 
 # 重新构建
+cd /var/www/ai-app-builder
 npm run build
+```
+
+### 4. SELinux 问题（CentOS）
+
+```bash
+# 临时关闭 SELinux
+setenforce 0
+
+# 永久关闭（需重启）
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 ```
 
 ---
@@ -195,28 +250,15 @@ npm run build
 ### 配置 HTTPS (Let's Encrypt)
 
 ```bash
-# 安装 Certbot
-apt-get install -y certbot python3-certbot-nginx
+# CentOS 安装 Certbot
+yum install -y certbot python3-certbot-nginx
 
 # 申请证书
 certbot --nginx -d your-domain.com
 
 # 自动续期
-certbot renew --dry-run
-```
-
-### 配置防火墙
-
-```bash
-# 允许 SSH
-ufw allow 22/tcp
-
-# 允许 HTTP/HTTPS
-ufw allow 80/tcp
-ufw allow 443/tcp
-
-# 启用防火墙
-ufw --force enable
+crontab -e
+# 添加: 0 0 * * * /usr/bin/certbot renew --quiet
 ```
 
 ---
@@ -228,3 +270,4 @@ ufw --force enable
 2. 端口 80 是否开放
 3. Nginx 配置是否正确
 4. PM2 进程是否正常运行
+5. SELinux 是否影响（CentOS）
