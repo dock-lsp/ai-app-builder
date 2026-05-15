@@ -25,14 +25,37 @@ jobs:
       - run: npm run build
       - run: npx cap add android || true
       - run: npx cap sync android
-      - name: Build Android APK
+      
+      # 配置签名
+      - name: Setup Signing
+        run: |
+          mkdir -p android/app
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/universal.keystore
+          cat > android/keystore.properties << EOF
+          storeFile=universal.keystore
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          EOF
+      
+      - name: Build Android APK (Signed)
         working-directory: android
-        run: ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
+        run: ./gradlew assembleRelease
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: android-apk-signed
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 7
+      
+      # 上传到 Nightly.link
+      - name: Upload to Nightly
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-android
+          path: android/app/build/outputs/apk/release/*.apk
 
   build-ios:
     runs-on: macos-latest
