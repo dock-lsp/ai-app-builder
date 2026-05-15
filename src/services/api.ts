@@ -37,10 +37,16 @@ async function request<T = any>(
 
 // ========== 认证 API ==========
 export const authApi = {
-  register: (email: string, password: string, nickname: string) =>
+  sendEmailCode: (email: string) =>
+    request('/auth/send-code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  register: (email: string, password: string, nickname: string, emailCode?: string) =>
     request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, nickname }),
+      body: JSON.stringify({ email, password, nickname, emailCode }),
     }),
 
   login: (email: string, password: string) =>

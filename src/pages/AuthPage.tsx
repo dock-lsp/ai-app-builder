@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
-import { LogIn, UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
 
@@ -14,10 +14,68 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [skipVerify, setSkipVerify] = useState(false);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const login = useAuthStore(s => s.login);
+
+  const clearCountdown = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => clearCountdown();
+  }, [clearCountdown]);
+
+  const handleSendCode = async () => {
+    if (!email) {
+      setError('请先输入邮箱地址');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('邮箱格式不正确');
+      return;
+    }
+
+    setError('');
+    setSendingCode(true);
+
+    try {
+      const res = await authApi.sendEmailCode(email);
+      if (res.success) {
+        if (res.data?.skipVerify) {
+          setSkipVerify(true);
+          setError('');
+          return;
+        }
+        // 开始60秒倒计时
+        setCountdown(60);
+        countdownRef.current = setInterval(() => {
+          setCountdown(prev => {
+            if (prev <= 1) {
+              clearCountdown();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (err: any) {
+      setError(err.message || '发送验证码失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +84,7 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
 
     try {
       if (mode === 'register') {
-        const res = await authApi.register(email, password, nickname);
+        const res = await authApi.register(email, password, nickname, emailCode || undefined);
         if (res.success && res.data) {
           login(res.data.token, res.data.user);
           onSuccess();
@@ -48,6 +106,21 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
   const switchMode = () => {
     setMode(mode === 'login' ? 'register' : 'login');
     setError('');
+    setEmailCode('');
+    setSkipVerify(false);
+    clearCountdown();
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 14px 12px 42px',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    backgroundColor: '#fff',
+    color: '#1a1a2e',
   };
 
   return (
@@ -134,12 +207,7 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
                 value={nickname}
                 onChange={e => setNickname(e.target.value)}
                 required
-                style={{
-                  width: '100%', padding: '12px 14px 12px 42px',
-                  borderRadius: '12px', border: '1px solid #e5e7eb',
-                  fontSize: '14px', outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
+                style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#667eea'}
                 onBlur={e => e.target.style.borderColor = '#e5e7eb'}
               />
@@ -157,16 +225,70 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              style={{
-                width: '100%', padding: '12px 14px 12px 42px',
-                borderRadius: '12px', border: '1px solid #e5e7eb',
-                fontSize: '14px', outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
+              style={inputStyle}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e => e.target.style.borderColor = '#e5e7eb'}
             />
           </div>
+
+          {/* 验证码输入区域（仅注册模式且未跳过验证时显示） */}
+          {mode === 'register' && !skipVerify && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <ShieldCheck size={18} style={{
+                  position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                }} />
+                <input
+                  type="text"
+                  placeholder="邮箱验证码"
+                  value={emailCode}
+                  onChange={e => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  maxLength={6}
+                  required
+                  style={{
+                    ...inputStyle,
+                    letterSpacing: '4px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#667eea'}
+                  onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSendCode}
+                disabled={sendingCode || countdown > 0}
+                style={{
+                  flexShrink: 0,
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #667eea',
+                  background: countdown > 0 ? '#f8fafc' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: countdown > 0 ? '#9ca3af' : 'white',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: sendingCode || countdown > 0 ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  minWidth: '110px',
+                  justifyContent: 'center',
+                }}
+              >
+                {sendingCode ? (
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : countdown > 0 ? (
+                  `${countdown}s 后重发`
+                ) : (
+                  '发送验证码'
+                )}
+              </button>
+            </div>
+          )}
 
           <div style={{ position: 'relative' }}>
             <Lock size={18} style={{
@@ -181,10 +303,8 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
               required
               minLength={6}
               style={{
-                width: '100%', padding: '12px 42px 12px 42px',
-                borderRadius: '12px', border: '1px solid #e5e7eb',
-                fontSize: '14px', outline: 'none',
-                transition: 'border-color 0.2s',
+                ...inputStyle,
+                paddingRight: '42px',
               }}
               onFocus={e => e.target.style.borderColor = '#667eea'}
               onBlur={e => e.target.style.borderColor = '#e5e7eb'}

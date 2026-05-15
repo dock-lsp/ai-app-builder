@@ -2,13 +2,45 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { createUser, getUserByEmail, getUserById, updateUser } from '../models/store.js';
 import { generateToken, JwtPayload } from '../middleware/auth.js';
+import { sendVerificationCode, verifyCode, isEmailConfigured } from '../services/email.js';
 
 export const authRouter = Router();
+
+// 发送邮箱验证码
+authRouter.post('/send-code', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ success: false, message: '邮箱不能为空' });
+      return;
+    }
+
+    // 简单邮箱格式校验
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ success: false, message: '邮箱格式不正确' });
+      return;
+    }
+
+    if (!isEmailConfigured()) {
+      // 邮件服务未配置，直接返回成功（跳过验证）
+      res.json({ success: true, message: '验证码已发送', data: { skipVerify: true } });
+      return;
+    }
+
+    await sendVerificationCode(email);
+
+    res.json({ success: true, message: '验证码已发送' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || '发送验证码失败' });
+  }
+});
 
 // 注册
 authRouter.post('/register', async (req: Request, res: Response) => {
   try {
-    const { email, password, nickname } = req.body;
+    const { email, password, nickname, emailCode } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ success: false, message: '邮箱和密码不能为空' });
@@ -18,6 +50,19 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     if (password.length < 6) {
       res.status(400).json({ success: false, message: '密码至少6位' });
       return;
+    }
+
+    // 如果配置了邮件服务，需要验证验证码
+    if (isEmailConfigured()) {
+      if (!emailCode) {
+        res.status(400).json({ success: false, message: '请输入邮箱验证码' });
+        return;
+      }
+
+      if (!verifyCode(email, emailCode)) {
+        res.status(400).json({ success: false, message: '验证码错误或已过期' });
+        return;
+      }
     }
 
     const existingUser = getUserByEmail(email);
