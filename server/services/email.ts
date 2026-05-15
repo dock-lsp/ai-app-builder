@@ -6,8 +6,26 @@ const codeStore = new Map<string, { code: string; expireAt: number }>();
 // 验证码过期时间：5分钟
 const CODE_EXPIRE_MS = 5 * 60 * 1000;
 
+// 邮件提供商类型
+type EmailProvider = 'gmail' | 'resend';
+
+// 获取邮件提供商
+function getEmailProvider(): EmailProvider {
+  if (process.env.EMAIL_PROVIDER === 'resend') {
+    return 'resend';
+  }
+  return 'gmail';
+}
+
 // 是否配置了邮件服务
 export function isEmailConfigured(): boolean {
+  const provider = getEmailProvider();
+  
+  if (provider === 'resend') {
+    return !!(process.env.EMAIL_API_KEY && process.env.EMAIL_FROM);
+  }
+  
+  // Gmail
   return !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 }
 
@@ -16,13 +34,26 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// 创建邮件传输器
-function createTransporter() {
+// 创建邮件传输器（Gmail）
+function createGmailTransporter() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
+    },
+  });
+}
+
+// 创建邮件传输器（Resend）
+function createResendTransporter() {
+  return nodemailer.createTransport({
+    host: 'smtp.resend.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: 'resend',
+      pass: process.env.EMAIL_API_KEY,
     },
   });
 }
@@ -34,10 +65,21 @@ export async function sendVerificationCode(email: string): Promise<string> {
   }
 
   const code = generateCode();
+  const provider = getEmailProvider();
 
-  const transporter = createTransporter();
+  let transporter;
+  let fromEmail: string;
+
+  if (provider === 'resend') {
+    transporter = createResendTransporter();
+    fromEmail = process.env.EMAIL_FROM!;
+  } else {
+    transporter = createGmailTransporter();
+    fromEmail = process.env.EMAIL_USER!;
+  }
+
   await transporter.sendMail({
-    from: `"AI App Builder" <${process.env.EMAIL_USER}>`,
+    from: `"AI App Builder" <${fromEmail}>`,
     to: email,
     subject: 'AI App Builder - 邮箱验证码',
     html: `
