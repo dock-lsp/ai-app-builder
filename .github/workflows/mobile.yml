@@ -22,7 +22,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - run: npm ci
-      - run: npm run build
       - run: npx cap add android || true
       - run: npx cap sync android
       
@@ -66,7 +65,6 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npm run build
       - run: npx cap add ios || true
       - run: npx cap sync ios
       - name: Build iOS
