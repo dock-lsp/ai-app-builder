@@ -220,7 +220,7 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
               color: '#9ca3af',
             }} />
             <input
-              type="email"
+              type="text"
               placeholder="邮箱地址"
               value={email}
               onChange={e => setEmail(e.target.value)}
