@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { createUser, getUserByEmail, updateUser } from '../models/store.js';
+import { createUser, getUserByEmail, getUserById, updateUser } from '../models/store.js';
 import { generateToken, JwtPayload } from '../middleware/auth.js';
 
 export const authRouter = Router();
