@@ -3,14 +3,53 @@
   "version": "1.0.0",
   "description": "AI App Builder 可视化编辑器",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "tsx watch server/index.ts",
-    "server:build": "tsc -p server/tsconfig.json"
+    "server:build": "tsc -p server/tsconfig.json",
+    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "cap:add:android": "npx cap add android",
+    "cap:add:ios": "npx cap add ios",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
+  },
+  "build": {
+    "appId": "com.aiappbuilder.app",
+    "productName": "AI App Builder",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    }
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.0.0",
     "cookie-parser": "^1.4.7",
@@ -36,6 +75,8 @@
     "@types/react-dom": "^18.2.7",
     "@types/uuid": "^9.0.2",
     "@vitejs/plugin-react": "^4.0.3",
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1",
     "tsx": "^4.22.0",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
