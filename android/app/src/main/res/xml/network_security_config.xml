@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 网络安全配置：允许后端API服务器的HTTP请求 -->
+<!-- API服务器地址在构建时由环境变量注入 -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">47.92.220.102</domain>
-    </domain-config>
-    <base-config cleartextTrafficPermitted="false">
+    <!-- 允许所有明文HTTP（用于开发/测试环境） -->
+    <!-- 生产环境应替换为具体的服务器地址 -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

@@ -24,6 +24,8 @@ jobs:
         run: npm run build:prod
         env:
           NODE_ENV: production
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.API_BASE_URL }}
       - name: Sync Capacitor Android
         run: npx cap sync android
       - name: Make Gradle executable
@@ -51,6 +53,8 @@ jobs:
         run: npm run build:prod
         env:
           NODE_ENV: production
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.API_BASE_URL }}
       - name: Sync Capacitor iOS
         run: npx cap sync ios
       - name: Build iOS Simulator
@@ -93,6 +97,8 @@ jobs:
         run: npm run build:prod
         env:
           NODE_ENV: production
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.API_BASE_URL }}
       - name: Setup HarmonyOS Project
         run: |
           mkdir -p harmony/entry/src/main/resources/base/profile
