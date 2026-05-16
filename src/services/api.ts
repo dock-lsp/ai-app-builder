@@ -3,8 +3,8 @@ import { Capacitor } from '@capacitor/core';
 // 根据运行环境选择API地址
 const isNativePlatform = Capacitor.isNativePlatform();
 
-// 生产环境后端地址（需要部署后端服务后替换）
-const PROD_API_BASE = 'https://your-api-domain.com/api';
+// 生产环境后端地址
+const PROD_API_BASE = 'http://47.92.220.102:3001/api';
 
 // 本地开发/桌面端使用相对路径
 const DEV_API_BASE = '/api';
