@@ -1,4 +1,4 @@
-name: Build & Test
+name: Build & Test (Release)
 
 on:
   push:
@@ -31,20 +31,23 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
-      - name: Build frontend
-        run: npm run build
+      - name: Build frontend (Production)
+        run: npm run build:prod
+        env:
+          NODE_ENV: production
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-production
           path: dist/
-          retention-days: 7
+          retention-days: 30
 
       - name: Build summary
         run: |
-          echo "## ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Production Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Node.js**: ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: Production" >> $GITHUB_STEP_SUMMARY
           echo "- **Build size**: $(du -sh dist/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "- **Files**: $(find dist -type f | wc -l)" >> $GITHUB_STEP_SUMMARY

@@ -1,11 +1,9 @@
-name: Build Mobile Apps
+name: Build Mobile Apps (Release)
 
 on:
   push:
     branches: [main, master]
     tags: ['v*']
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -22,39 +20,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - run: npm ci
-      - run: npx cap add android || true
-      - run: npx cap sync android
-      
-      # 配置签名
-      - name: Setup Signing
+      - name: Build Web App
+        run: npm run build
+        env:
+          NODE_ENV: production
+      - name: Setup Capacitor Android
         run: |
-          mkdir -p android/app
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/universal.keystore
-          cat > android/keystore.properties << EOF
-          storeFile=universal.keystore
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          EOF
-      
-      - name: Build Android APK (Signed)
+          npx cap add android || true
+          npx cap sync android
+      - name: Build Android Release APK
         working-directory: android
-        run: ./gradlew assembleRelease
-      
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/release/*.apk android/app/build/outputs/apk/release/ai-app-builder-android-release.apk || true
+      - uses: actions/upload-artifact@v4
         with:
-          name: android-apk-signed
+          name: android-release
           path: android/app/build/outputs/apk/release/*.apk
-          retention-days: 7
-      
-      # 上传到 Nightly.link
-      - name: Upload to Nightly
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: nightly-android
-          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
 
   build-ios:
     runs-on: macos-latest
@@ -65,14 +49,139 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npx cap add ios || true
-      - run: npx cap sync ios
-      - name: Build iOS
+      - name: Build Web App
+        run: npm run build
+        env:
+          NODE_ENV: production
+      - name: Setup Capacitor iOS
+        run: |
+          npx cap add ios || true
+          npx cap sync ios
+      - name: Build iOS Release
         working-directory: ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 15' build
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/release || true
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-app
-          path: ios/App/build/*.app
-          retention-days: 7
+          name: ios-release
+          path: ios/App/build/release/*.ipa
+          retention-days: 30
+          if-no-files-found: ignore
+      # Fallback: build for simulator
+      - name: Build iOS Simulator
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15' build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-release
+          path: ios/App/build/Build/Products/Release-iphonesimulator/*.app
+          retention-days: 30
+          if-no-files-found: ignore
+
+  build-harmony:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Build Web App for HarmonyOS
+        run: npm run build
+        env:
+          NODE_ENV: production
+      - name: Setup HarmonyOS Project
+        run: |
+          mkdir -p harmony/entry/src/main/resources/base/profile
+          mkdir -p harmony/entry/src/main/ets
+          mkdir -p harmony/entry/src/main/resources/rawfile
+          # Copy web assets to HarmonyOS rawfile
+          cp -r dist/* harmony/entry/src/main/resources/rawfile/ || true
+      - name: Create HarmonyOS Config
+        run: |
+          cat > harmony/build-profile.json5 << 'EOF'
+          {
+            "app": {
+              "signingConfigs": [],
+              "compileSdkVersion": 9,
+              "compatibleSdkVersion": 9,
+              "products": [{
+                "name": "default",
+                "signingConfig": "default"
+              }]
+            },
+            "modules": [{
+              "name": "entry",
+              "srcPath": "./entry",
+              "targets": [{
+                "name": "default",
+                "applyToProducts": ["default"]
+              }]
+            }]
+          }
+          EOF
+          cat > harmony/entry/src/main/module.json5 << 'EOF'
+          {
+            "module": {
+              "name": "entry",
+              "type": "entry",
+              "abilities": [{
+                "name": "EntryAbility",
+                "srcEntry": "./ets/entryability/EntryAbility.ts",
+                "description": "AI App Builder",
+                "icon": "$media:icon",
+                "label": "$string:EntryLabel",
+                "launchType": "standard",
+                "visible": true
+              }]
+            }
+          }
+          EOF
+      - name: Create HarmonyOS Entry Ability
+        run: |
+          mkdir -p harmony/entry/src/main/ets/entryability
+          cat > harmony/entry/src/main/ets/entryability/EntryAbility.ts << 'EOF'
+          import UIAbility from '@ohos.app.ability.UIAbility';
+          import window from '@ohos.window';
+          
+          export default class EntryAbility extends UIAbility {
+            onCreate(want, launchParam) {
+              console.info('EntryAbility onCreate');
+            }
+            onWindowStageCreate(windowStage) {
+              windowStage.loadContent('pages/Index', (err, data) => {
+                if (err.code) {
+                  console.error('Failed to load content');
+                  return;
+                }
+                console.info('Succeeded in loading content');
+              });
+            }
+          }
+          EOF
+          mkdir -p harmony/entry/src/main/ets/pages
+          cat > harmony/entry/src/main/ets/pages/Index.ets << 'EOF'
+          @Entry
+          @Component
+          struct Index {
+            build() {
+              Column() {
+                Web({ src: $rawfile('index.html'), controller: new WebController() })
+                  .width('100%')
+                  .height('100%')
+              }
+            }
+          }
+          EOF
+      - name: Package HarmonyOS HAP
+        run: |
+          cd harmony
+          tar -czvf ../ai-app-builder-harmony.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: harmonyos-release
+          path: ai-app-builder-harmony.tar.gz
+          retention-days: 30

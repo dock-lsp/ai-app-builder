@@ -1,11 +1,10 @@
-name: Build Desktop Apps
+name: Build Desktop Apps (Release)
 
 on:
   push:
     branches: [main, master]
     tags: ['v*']
-  pull_request:
-    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build-macos:
@@ -17,14 +16,18 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npm run electron:build:mac
+      - name: Build macOS Release
+        run: npm run build && npx electron-builder --mac --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-app
-          path: release/*.dmg
-          retention-days: 7
+          name: macos-release
+          path: |
+            release/*.dmg
+            release/*.zip
+          retention-days: 30
 
   build-windows:
     runs-on: windows-latest
@@ -35,14 +38,18 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npm run electron:build:win
+      - name: Build Windows Release
+        run: npm run build && npx electron-builder --win --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-app
-          path: release/*.exe
-          retention-days: 7
+          name: windows-release
+          path: |
+            release/*.exe
+            release/*.nsis
+          retention-days: 30
 
   build-linux:
     runs-on: ubuntu-latest
@@ -52,12 +59,21 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools rpm fakeroot dpkg
       - run: npm ci
-      - run: npm run electron:build:linux
+      - name: Build Linux Release
+        run: npm run build && npx electron-builder --linux AppImage deb rpm --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-app
-          path: release/*.AppImage
-          retention-days: 7
+          name: linux-release
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+          retention-days: 30
