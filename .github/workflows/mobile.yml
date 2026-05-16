@@ -65,8 +65,8 @@ jobs:
           APP_PATH=$(find ios/App/build/Build/Products -name "*.app" -type d | head -1)
           echo "Found app: $APP_PATH"
           if [ -n "$APP_PATH" ]; then
-            DIR=$(dirname "$APP_PATH")
-            zip -r "$GITHUB_WORKSPACE/ios-app.zip" -j "$DIR"/*.app
+            cd "$(dirname "$APP_PATH")"
+            zip -r "$GITHUB_WORKSPACE/ios-app.zip" *.app
             ls -lh "$GITHUB_WORKSPACE/ios-app.zip"
           else
             echo "No .app found"
