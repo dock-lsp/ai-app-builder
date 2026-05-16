@@ -1,4 +1,15 @@
-const API_BASE = '/api';
+import { Capacitor } from '@capacitor/core';
+
+// 根据运行环境选择API地址
+const isNativePlatform = Capacitor.isNativePlatform();
+
+// 生产环境后端地址（需要部署后端服务后替换）
+const PROD_API_BASE = 'https://your-api-domain.com/api';
+
+// 本地开发/桌面端使用相对路径
+const DEV_API_BASE = '/api';
+
+const API_BASE = isNativePlatform ? PROD_API_BASE : DEV_API_BASE;
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -21,18 +32,33 @@ async function request<T = any>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  const data = await response.json();
+    // 检查响应内容类型
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Non-JSON response:', text.substring(0, 200));
+      throw new Error('服务器返回格式错误，请检查网络连接');
+    }
 
-  if (!response.ok) {
-    throw new Error(data.message || '请求失败');
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || '请求失败');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络设置');
+    }
+    throw error;
   }
-
-  return data;
 }
 
 // ========== 认证 API ==========
