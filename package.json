@@ -2,6 +2,11 @@
   "name": "ai-app-builder-editor",
   "version": "1.0.0",
   "description": "AI App Builder 可视化编辑器 - 正式版",
+  "author": {
+    "name": "dock-lsp",
+    "email": "dock-lsp@users.noreply.github.com"
+  },
+  "license": "MIT",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
