@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 网络安全配置：允许后端API服务器的HTTP请求 -->
-<!-- API服务器地址在构建时由环境变量注入 -->
+<!-- 网络安全配置：使用HTTPS，禁止明文HTTP -->
 <network-security-config>
-    <!-- 允许所有明文HTTP（用于开发/测试环境） -->
-    <!-- 生产环境应替换为具体的服务器地址 -->
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
+            <!-- 信任自签名证书 -->
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>
