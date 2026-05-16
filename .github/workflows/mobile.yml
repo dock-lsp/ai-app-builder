@@ -56,7 +56,10 @@ jobs:
       - name: Build iOS Simulator
         working-directory: ios/App
         run: |
-          xcodebuild -project App.xcodeproj -scheme App -configuration Release -destination 'platform=iOS Simulator,name=iPhone 16' build
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -derivedDataPath build \
+            build
       - name: Package iOS App
         run: |
           cd ios/App/build/Build/Products/Release-iphonesimulator
