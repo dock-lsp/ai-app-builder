@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 网络安全配置：使用HTTPS，禁止明文HTTP -->
+<!-- 网络安全配置：允许HTTP明文流量 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
-            <!-- 信任自签名证书 -->
             <certificates src="user" />
         </trust-anchors>
     </base-config>
